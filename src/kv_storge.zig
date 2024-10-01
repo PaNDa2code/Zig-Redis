@@ -43,11 +43,9 @@ pub var kv_hashmap: ?*DBhashmap = null;
 test "database hashmap" {
     const allocator = std.testing.allocator;
 
-    // Create an instance of DBhashmap
     const db_hashmap_ptr = try allocator.create(DBhashmap);
     db_hashmap_ptr.init(allocator);
 
-    // Adding entries to the hashmap
     var key: [10]u8 = std.mem.zeroes([10]u8);
     var value: [10]u8 = std.mem.zeroes([10]u8);
 
@@ -66,7 +64,6 @@ test "database hashmap" {
         std.debug.assert(std.mem.eql(u8, value_slice, result.?));
     }
 
-    // Clean up
     db_hashmap_ptr.deinit();
     allocator.destroy(db_hashmap_ptr);
 }
