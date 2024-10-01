@@ -1,14 +1,11 @@
 const std = @import("std");
 const net = std.net;
-
-var rwlock: std.Thread.RwLock = .{};
-var kv_hashmap = &@import("kv_storge.zig").kv_hashmap;
+const kv_storge = @import("kv_storge.zig");
 
 const tokenizerType = std.mem.TokenIterator(u8, std.mem.DelimiterType.any);
-
 const CommandFunctionType = fn (net.Server.Connection, *tokenizerType) void;
-
 const CommandLookUpOb = struct { name: []const u8, fn_ptr: *const CommandFunctionType };
+
 const CommandLookUpTable = &[_]CommandLookUpOb{
     .{ .name = "PING", .fn_ptr = &ping },
     .{ .name = "CONFIG", .fn_ptr = &config },
@@ -17,37 +14,35 @@ const CommandLookUpTable = &[_]CommandLookUpOb{
 };
 
 pub fn handle_client(client: net.Server.Connection) !void {
+    defer client.stream.close();
     var buffer: [1024]u8 = undefined;
+
     while (true) {
         const bytes = try client.stream.read(&buffer);
         if (bytes == 0) {
             break;
         }
 
-        // Tokenize the input to get the command name
         var it = std.mem.tokenizeAny(u8, buffer[0..bytes], "\r\n");
 
         _ = it.next();
         _ = it.next();
-        const command_name = it.next().?;
+        const command_name = it.next() orelse "";
 
-        // Lookup the command function
         const command_function = command_lookup(command_name);
 
         if (command_function != null) {
-            // Call the command function if found
             command_function.?(client, &it);
         } else {
-            // Handle unknown command case
             _ = try client.stream.write("+-Unknown command\r\n");
         }
     }
-
-    // Close the connection
-    defer client.stream.close();
 }
 
 fn command_lookup(command: []const u8) ?*const CommandFunctionType {
+    if (command.len == 0) {
+        return null;
+    }
     for (CommandLookUpTable) |comm| {
         if (std.ascii.eqlIgnoreCase(command, comm.name)) {
             return comm.fn_ptr;
@@ -82,11 +77,9 @@ fn set(client: net.Server.Connection, tokens: *tokenizerType) void {
         return;
     }
 
-    rwlock.lock();
-    const put_return = kv_hashmap.*.?.put(key.?, value.?);
-    rwlock.unlock();
+    const add_return = kv_storge.kv_hashmap.?.add(key.?, value.?);
 
-    put_return catch {
+    add_return catch {
         _ = client.stream.write("-error\r\n") catch {};
         return;
     };
@@ -102,9 +95,7 @@ fn get(client: net.Server.Connection, tokens: *tokenizerType) void {
         return;
     }
 
-    rwlock.lockShared();
-    const value = kv_hashmap.*.?.get(key.?);
-    rwlock.unlockShared();
+    const value = kv_storge.kv_hashmap.?.get(key.?);
 
     if (value) |val| {
         write_bluk_string(writer, val) catch {};
