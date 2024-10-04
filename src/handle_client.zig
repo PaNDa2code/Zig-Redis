@@ -39,6 +39,16 @@ pub fn handle_client(client: net.Server.Connection) !void {
     }
 }
 
+pub fn remove_from_thread_bool(thread_pool: *std.ArrayList(std.Thread)) !void {
+    const curr_thread = std.Thread.getCurrentId();
+
+    for (thread_pool.items, 0..thread_pool.items.len) |thread, i| {
+        if (thread.id == curr_thread) {
+            thread_pool.swapRemove(i);
+        }
+    }
+}
+
 fn command_lookup(command: []const u8) ?*const CommandFunctionType {
     if (command.len == 0) {
         return null;
