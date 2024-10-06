@@ -49,16 +49,16 @@ pub const DBhashmap = struct {
     }
 };
 
-pub var kv_hashmap: ?*DBhashmap = null;
+pub var db_hashmap_ptr: ?*DBhashmap = null;
 
 test "test DBhashmap" {
     const allocator = std.testing.allocator;
-    var db_hashmap: DBhashmap = undefined;
+    var hashmap: DBhashmap = undefined;
 
-    db_hashmap.init(allocator);
-    defer db_hashmap.deinit();
+    hashmap.init(allocator);
+    defer hashmap.deinit();
 
     for (0..100) |_| {
-        try db_hashmap.add("key", "value");
+        try hashmap.add("key", "value");
     }
 }

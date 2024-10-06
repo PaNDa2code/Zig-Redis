@@ -1,6 +1,7 @@
 const std = @import("std");
 const net = std.net;
-const kv_storge = @import("kv_storge.zig");
+
+const db = @import("db.zig");
 
 const tokenizerType = std.mem.TokenIterator(u8, std.mem.DelimiterType.any);
 const CommandFunctionType = fn (net.Server.Connection, *tokenizerType) void;
@@ -88,7 +89,7 @@ fn set(client: net.Server.Connection, tokens: *tokenizerType) void {
         return;
     }
 
-    const add_return = kv_storge.kv_hashmap.?.add(key.?, value.?);
+    const add_return = db.db_hashmap_ptr.?.add(key.?, value.?);
 
     add_return catch {
         _ = client.stream.write("-error\r\n") catch {};
@@ -106,7 +107,7 @@ fn get(client: net.Server.Connection, tokens: *tokenizerType) void {
         return;
     }
 
-    const value = kv_storge.kv_hashmap.?.get(key.?);
+    const value = db.db_hashmap_ptr.?.get(key.?);
 
     if (value) |val| {
         write_bluk_string(writer, val) catch {};

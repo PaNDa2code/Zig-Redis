@@ -1,9 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const net = std.net;
-const kv_storge = @import("kv_storge.zig");
 
-const DBhashmap = kv_storge.DBhashmap;
+const db = @import("db.zig");
+
+const DBhashmap = db.DBhashmap;
 
 const handle_client = @import("handle_client.zig").handle_client;
 const signal_handle = @import("signal_handle.zig");
@@ -45,12 +46,12 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    kv_storge.kv_hashmap = try allocator.create(DBhashmap);
-    kv_storge.kv_hashmap.?.init(allocator);
+    db.db_hashmap_ptr = try allocator.create(DBhashmap);
+    db.db_hashmap_ptr.?.init(allocator);
 
     defer {
-        kv_storge.kv_hashmap.?.deinit();
-        allocator.destroy(kv_storge.kv_hashmap.?);
+        db.db_hashmap_ptr.?.deinit();
+        allocator.destroy(db.db_hashmap_ptr.?);
     }
 
     var server = try my_server.EpollServer.init(localhost);
