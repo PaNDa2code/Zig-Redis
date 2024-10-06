@@ -12,7 +12,7 @@ const my_server = @import("my_server.zig");
 pub var server_ptr: ?*my_server.EpollServer = null;
 
 var active_clients: std.ArrayList(net.Server.Connection) = undefined;
-var thread_pool: std.ArrayList(std.Thread) = undefined;
+pub var thread_pool: std.ArrayList(std.Thread) = undefined;
 
 const os_tag = builtin.os.tag;
 
@@ -33,16 +33,20 @@ pub fn main() !void {
     const loopback = try net.Ip4Address.parse("127.0.0.1", 6379);
     const localhost = net.Address{ .in = loopback };
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = false, .safety = false }){};
     defer {
         const check = gpa.deinit();
-        std.debug.print("[!] GPA check: {any}\n", .{check});
+        if (check == .ok) {
+            std.debug.print("[^-^] No leaks detected\n", .{});
+        } else {
+            std.debug.print("[ToT] GPA detected leaks\n", .{});
+        }
     }
 
     const allocator = gpa.allocator();
 
     kv_storge.kv_hashmap = try allocator.create(DBhashmap);
-    kv_storge.kv_hashmap.?.*.init(allocator);
+    kv_storge.kv_hashmap.?.init(allocator);
 
     defer {
         kv_storge.kv_hashmap.?.deinit();
@@ -56,7 +60,7 @@ pub fn main() !void {
     defer server.deinit();
 
     const addr = server.StdServer.listen_address;
-    std.debug.print("Listing on {any}\n", .{addr});
+    std.debug.print("(⌐■_■) Listing on {any}\n", .{addr});
 
     thread_pool = std.ArrayList(std.Thread).init(allocator);
     defer thread_pool.deinit();
@@ -74,6 +78,10 @@ pub fn main() !void {
             }
         };
         const thread = try std.Thread.spawn(.{}, handle_client, .{client});
-        thread.detach();
+        try thread_pool.append(thread);
+    }
+
+    for (thread_pool.items) |thread| {
+        thread.join();
     }
 }

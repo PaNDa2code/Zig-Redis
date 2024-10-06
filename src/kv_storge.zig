@@ -12,6 +12,7 @@ pub const DBhashmap = struct {
     }
 
     pub fn deinit(self: *DBhashmap) void {
+        // no unlocks sence, there is no access after this call
         self.rwlock.lock();
         var iterator = self.kv_hashmap.iterator();
         while (iterator.next()) |entry| {
@@ -19,17 +20,27 @@ pub const DBhashmap = struct {
             self.allocator.free(entry.value_ptr.*);
         }
         self.kv_hashmap.deinit();
-        self.rwlock.unlock();
     }
 
     pub fn add(self: *DBhashmap, key: []const u8, value: []const u8) !void {
-        const key_copy = try self.allocator.dupe(u8, key);
-        const value_copy = try self.allocator.dupe(u8, value);
+        const key_copy = self.allocator.dupe(u8, key) catch unreachable;
+        const value_copy = self.allocator.dupe(u8, value) catch unreachable;
+
+        errdefer {
+            self.allocator.free(key_copy);
+            self.allocator.free(value_copy);
+        }
 
         self.rwlock.lock();
-        self.kv_hashmap.put(key_copy, value_copy) catch unreachable;
+        const entry = self.kv_hashmap.fetchPut(key_copy, value_copy);
         self.rwlock.unlock();
+
+        if (try entry) |kv| {
+            self.allocator.free(key_copy);
+            self.allocator.free(kv.value);
+        }
     }
+
     pub fn get(self: *DBhashmap, key: []const u8) ?[]const u8 {
         self.rwlock.lockShared();
         const value = self.kv_hashmap.get(key);
@@ -39,3 +50,15 @@ pub const DBhashmap = struct {
 };
 
 pub var kv_hashmap: ?*DBhashmap = null;
+
+test "test DBhashmap" {
+    const allocator = std.testing.allocator;
+    var db_hashmap: DBhashmap = undefined;
+
+    db_hashmap.init(allocator);
+    defer db_hashmap.deinit();
+
+    for (0..100) |_| {
+        try db_hashmap.add("key", "value");
+    }
+}

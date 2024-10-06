@@ -19,7 +19,7 @@ pub const EpollServer = struct {
 
     pub fn init(address: std.net.Address) !EpollServer {
         var server: EpollServer = undefined;
-        server.StdServer = try address.listen(.{});
+        server.StdServer = try address.listen(.{ .reuse_address = true, .reuse_port = true });
         const socket_fd = server.StdServer.stream.handle;
         const old_flags = try posix.fcntl(socket_fd, F_GETFL, 0);
         _ = try posix.fcntl(socket_fd, F_SETFL, old_flags | O_NONBLOCK);
@@ -57,7 +57,7 @@ pub const EpollServer = struct {
         var accepted_address: std.net.Address = undefined;
         var address_len: posix.socklen_t = @sizeOf(std.net.Address);
         while (true) {
-            const events_count = posix.epoll_wait(self.epoll_fd, &self.epoll_events, 1000);
+            const events_count = posix.epoll_wait(self.epoll_fd, &self.epoll_events, -1);
             if (events_count == -1) {
                 return AcceptError.Unexpected;
             }
@@ -66,7 +66,8 @@ pub const EpollServer = struct {
                 if (self.epoll_events[i].events & EPOLLIN == 0) {
                     break;
                 } else if (self.epoll_events[i].data.fd == self.StdServer.stream.handle) {
-                    const client_fd = try posix.accept(self.StdServer.stream.handle, &accepted_address.any, &address_len, posix.SOCK.CLOEXEC);
+                    const client_fd =
+                        try posix.accept(self.StdServer.stream.handle, &accepted_address.any, &address_len, posix.SOCK.CLOEXEC);
                     return .{ .stream = .{ .handle = client_fd }, .address = accepted_address };
                 } else if (self.epoll_events[i].data.fd == self.pipe_fds.read_fd) {
                     return AcceptError.SignalReseved;
