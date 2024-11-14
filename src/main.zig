@@ -10,7 +10,7 @@ const handle_client = @import("handle_client.zig").handle_client;
 const signal_handle = @import("signal_handle.zig");
 const my_server = @import("my_server.zig");
 
-pub var server_ptr: ?*my_server.EpollServer = null;
+pub var server_ptr: ?*my_server.MyServer = null;
 
 var active_clients: std.ArrayList(net.Server.Connection) = undefined;
 pub var thread_pool: std.ArrayList(std.Thread) = undefined;
@@ -54,7 +54,7 @@ pub fn main() !void {
         allocator.destroy(db.db_hashmap_ptr.?);
     }
 
-    var server = try my_server.EpollServer.init(localhost);
+    var server = try my_server.MyServer.init(localhost);
 
     server_ptr = &server;
 
@@ -71,7 +71,7 @@ pub fn main() !void {
 
     while (true) {
         const client = server.accept() catch |err| {
-            if (err == my_server.EpollServer.AcceptError.SignalReseved) {
+            if (err == my_server.MyServer.AcceptError.SignalReseved) {
                 break;
             } else {
                 std.debug.print("error: {any}", .{err});

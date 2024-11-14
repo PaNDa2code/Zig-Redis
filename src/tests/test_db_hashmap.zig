@@ -1,5 +1,5 @@
 const std = @import("std");
-const DBhashmap = @import("../kv_storge.zig").DBhashmap;
+const DBhashmap = @import("../db.zig").DBhashmap;
 
 test "database hashmap" {
     const allocator = std.testing.allocator;

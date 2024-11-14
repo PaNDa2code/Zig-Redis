@@ -16,9 +16,6 @@ test "test_set" {
 
     const num_requests: usize = 10_000; // Number of requests to send for the benchmark
 
-    // Start the timer for benchmarking
-    // const start_time = std.time.milliTimestamp();
-
     var i: usize = 0;
     while (i < num_requests) : (i += 1) {
         // Example Redis SET command to send
@@ -31,14 +28,4 @@ test "test_set" {
         var buffer: [16]u8 = undefined;
         _ = try client.read(&buffer);
     }
-
-    // End the timer
-    // const end_time = std.time.milliTimestamp();
-
-    // Calculate the total time taken
-    // const total_time = end_time - start_time;
-    // const requests_per_second = try std.math.divCeil(i64, num_requests * 1000, total_time);
-
-    // std.debug.print("Completed {d} requests in {d} ms.\n", .{ num_requests, total_time });
-    // std.debug.print("Requests per second: {d} req/sec.\n", .{requests_per_second});
 }
