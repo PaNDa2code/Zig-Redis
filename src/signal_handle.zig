@@ -21,6 +21,6 @@ fn signal_handler() void {
     _ = stdin.read(answer[0..]) catch unreachable;
 
     if (answer[0] == 'y') {
-        @import("main.zig").server_ptr.?.stop_accepting();
+        @import("main.zig").server.stop_accepting();
     }
 }

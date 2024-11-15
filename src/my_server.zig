@@ -16,17 +16,15 @@ pub const MyServer = struct {
 
     pub const AcceptError = error{ SignalReceived, ConnectionFailed };
 
-    pub fn init(address: std.net.Address, allocator: std.mem.Allocator) !MyServer {
+    pub fn init(self: *MyServer, address: std.net.Address, allocator: std.mem.Allocator) !void {
         const server = try address.listen(.{
             .reuse_port = true,
             // .force_nonblocking = true,
         });
-        return MyServer{
-            .allocator = allocator,
-            .address = address,
-            .server = server,
-            .listening = true,
-        };
+        self.allocator = allocator;
+        self.address = address;
+        self.server = server;
+        self.listening = true;
     }
 
     pub fn deinit(self: *MyServer) void {

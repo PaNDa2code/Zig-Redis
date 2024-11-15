@@ -40,16 +40,6 @@ pub fn handle_client(client: net.Server.Connection) !void {
     }
 }
 
-fn remove_from_thread_bool(thread_pool: *std.ArrayList(std.Thread)) void {
-    const curr_thread = std.Thread.getCurrentId();
-
-    for (thread_pool.items, 0..thread_pool.items.len) |thread, i| {
-        if (thread.Id == curr_thread) {
-            _ = thread_pool.swapRemove(i);
-        }
-    }
-}
-
 fn command_lookup(command: []const u8) ?*const CommandFunctionType {
     if (command.len == 0) {
         return null;
@@ -81,7 +71,6 @@ fn set(client: net.Server.Connection, tokens: *tokenizerType) void {
     _ = tokens.next();
     const key = tokens.next();
     _ = tokens.next();
-    // _ = tokens.next();
     const value = tokens.next();
 
     if (key == null or value == null) {

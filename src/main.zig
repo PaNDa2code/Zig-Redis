@@ -1,16 +1,19 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const net = std.net;
-
 const db = @import("db.zig");
-
-const DBhashmap = db.DBhashmap;
-
 const handle_client = @import("handle_client.zig").handle_client;
 const signal_handle = @import("signal_handle.zig");
 const my_server = @import("my_server.zig");
+const MyServer = my_server.MyServer;
+const DBhashmap = db.DBhashmap;
 
-pub var server_ptr: ?*my_server.MyServer = null;
+pub var server = MyServer{
+    .server = undefined,
+    .allocator = undefined,
+    .address = undefined,
+    .listening = undefined,
+};
 
 var active_clients: std.ArrayList(net.Server.Connection) = undefined;
 pub var thread_pool: std.ArrayList(std.Thread) = undefined;
@@ -34,18 +37,19 @@ pub fn main() !void {
     const loopback = try net.Ip4Address.parse("127.0.0.1", 6379);
     const localhost = net.Address{ .in = loopback };
 
-    // var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = false, .safety = false }){};
-    // defer {
-    //     const check = gpa.deinit();
-    //     if (check == .ok) {
-    //         std.debug.print("[^-^] No leaks detected\n", .{});
-    //     } else {
-    //         std.debug.print("[ToT] GPA detected leaks\n", .{});
-    //     }
-    // }
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
-    // c_allocator is much faster ;)
-    const allocator = std.heap.raw_c_allocator;
+    defer {
+        if (builtin.mode == .Debug) {
+            if (gpa.deinit() == .leak) {
+                std.debug.print("[ToT] GPA detected memory leaks\n", .{});
+            } else {
+                std.debug.print("[^_^] No leaks detected\n", .{});
+            }
+        }
+    }
+
+    const allocator = if (builtin.mode == .Debug) gpa.allocator() else std.heap.c_allocator;
 
     db.db_hashmap_ptr = try allocator.create(DBhashmap);
     db.db_hashmap_ptr.?.init(allocator);
@@ -55,9 +59,7 @@ pub fn main() !void {
         allocator.destroy(db.db_hashmap_ptr.?);
     }
 
-    var server = try my_server.MyServer.init(localhost, allocator);
-
-    server_ptr = &server;
+    try server.init(localhost, allocator);
 
     defer server.deinit();
 
@@ -72,7 +74,7 @@ pub fn main() !void {
     while (server.listening) {
         const client = server.accept() catch |err| {
             if (err == std.net.Server.AcceptError.SocketNotListening) {
-                std.debug.print("[0_0] Server is stoped\n", .{});
+                std.debug.print("[0_0] Server is stopped\n", .{});
                 break;
             } else {
                 std.debug.print("error: {any}", .{err});
