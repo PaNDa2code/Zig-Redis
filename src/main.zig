@@ -54,14 +54,13 @@ pub fn main() !void {
         allocator.destroy(db.db_hashmap_ptr.?);
     }
 
-    var server = try my_server.MyServer.init(localhost);
+    var server = try my_server.MyServer.init(localhost, allocator);
 
     server_ptr = &server;
 
     defer server.deinit();
 
-    const addr = server.StdServer.listen_address;
-    std.debug.print("(⌐■_■) Listing on {any}\n", .{addr});
+    std.debug.print("(⌐■_■) Listing on {any}\n", .{localhost});
 
     thread_pool = std.ArrayList(std.Thread).init(allocator);
     defer thread_pool.deinit();
@@ -69,9 +68,10 @@ pub fn main() !void {
     active_clients = std.ArrayList(net.Server.Connection).init(allocator);
     defer active_clients.deinit();
 
-    while (true) {
+    while (server.listening) {
         const client = server.accept() catch |err| {
-            if (err == my_server.MyServer.AcceptError.SignalReseved) {
+            if (err == std.net.Server.AcceptError.SocketNotListening) {
+                std.debug.print("[0_0] Server is stoped\n", .{});
                 break;
             } else {
                 std.debug.print("error: {any}", .{err});

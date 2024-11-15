@@ -1,82 +1,54 @@
 const std = @import("std");
+const network = @import("network");
+const net = std.net;
+
 const builtin = @import("builtin");
-const posix = std.posix;
+const os_tag = builtin.os.tag;
 
-const F_GETFL = 3;
-const F_SETFL = 4;
-const O_NONBLOCK = 2048;
-
-const EPOLLIN = 0x001;
-const EPOLL_CTL_ADD = 1;
+const is_windows = os_tag == .windows;
+const is_posix = os_tag == .linux or os_tag == .macos;
 
 pub const MyServer = struct {
-    StdServer: std.net.Server,
-    pipe_fds: struct { read_fd: posix.fd_t, write_fd: posix.fd_t },
-    epoll_events: [2]posix.system.epoll_event,
-    epoll_fd: i32,
+    allocator: std.mem.Allocator,
+    address: std.net.Address,
+    server: std.net.Server,
+    listening: bool,
 
-    pub const AcceptError = error{SignalReseved} || posix.PipeError;
+    pub const AcceptError = error{ SignalReceived, ConnectionFailed };
 
-    pub fn init(address: std.net.Address) !MyServer {
-        var server: MyServer = undefined;
-        server.StdServer = try address.listen(.{ .reuse_address = true, .reuse_port = true });
-        const socket_fd = server.StdServer.stream.handle;
-        const old_flags = try posix.fcntl(socket_fd, F_GETFL, 0);
-        _ = try posix.fcntl(socket_fd, F_SETFL, old_flags | O_NONBLOCK);
-
-        server.epoll_fd = try posix.epoll_create1(0);
-
-        const pipe_fds = try posix.pipe();
-        server.pipe_fds.read_fd = pipe_fds[0];
-        server.pipe_fds.write_fd = pipe_fds[1];
-
-        server.epoll_events[0] = posix.system.epoll_event{
-            .events = EPOLLIN,
-            .data = .{ .fd = socket_fd },
+    pub fn init(address: std.net.Address, allocator: std.mem.Allocator) !MyServer {
+        const server = try address.listen(.{
+            .reuse_port = true,
+            // .force_nonblocking = true,
+        });
+        return MyServer{
+            .allocator = allocator,
+            .address = address,
+            .server = server,
+            .listening = true,
         };
-        try posix.epoll_ctl(server.epoll_fd, EPOLL_CTL_ADD, socket_fd, &server.epoll_events[0]);
-
-        server.epoll_events[1] = posix.system.epoll_event{
-            .events = EPOLLIN,
-            .data = .{ .fd = server.pipe_fds.read_fd },
-        };
-
-        try posix.epoll_ctl(server.epoll_fd, EPOLL_CTL_ADD, server.pipe_fds.read_fd, &server.epoll_events[1]);
-
-        return server;
     }
 
     pub fn deinit(self: *MyServer) void {
-        posix.close(self.epoll_fd);
-        posix.close(self.pipe_fds.read_fd);
-        posix.close(self.pipe_fds.write_fd);
-        self.StdServer.deinit();
+        self.server.deinit();
     }
 
     pub fn accept(self: *MyServer) !std.net.Server.Connection {
-        var accepted_address: std.net.Address = undefined;
-        var address_len: posix.socklen_t = @sizeOf(std.net.Address);
-        while (true) {
-            const events_count = posix.epoll_wait(self.epoll_fd, &self.epoll_events, -1);
-            if (events_count == -1) {
-                return AcceptError.Unexpected;
-            }
-
-            for (0..events_count) |i| {
-                if (self.epoll_events[i].events & EPOLLIN == 0) {
-                    break;
-                } else if (self.epoll_events[i].data.fd == self.StdServer.stream.handle) {
-                    const client_fd =
-                        try posix.accept(self.StdServer.stream.handle, &accepted_address.any, &address_len, posix.SOCK.CLOEXEC);
-                    return .{ .stream = .{ .handle = client_fd }, .address = accepted_address };
-                } else if (self.epoll_events[i].data.fd == self.pipe_fds.read_fd) {
-                    return AcceptError.SignalReseved;
-                }
-            }
+        if (self.listening) {
+            return self.server.accept();
+        } else {
+            return std.net.Server.AcceptError.SocketNotListening;
         }
     }
 
     pub fn stop_accepting(self: *MyServer) void {
-        _ = posix.write(self.pipe_fds.write_fd, "\xFF") catch unreachable;
+        if (is_posix) {
+            std.posix.shutdown(self.server.stream.handle, std.posix.ShutdownHow.recv) catch |err| {
+                std.debug.print("{any}", .{err});
+            };
+        } else if (is_windows) {
+            _ = std.os.windows.ws2_32.shutdown(self.server.stream.handle, std.os.windows.ws2_32.SD_RECEIVE);
+        }
+        self.listening = false;
     }
 };
