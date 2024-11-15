@@ -6,17 +6,17 @@ pub fn linux_signal_handler(sig: i32) callconv(.C) void {
     signal_handler();
 }
 
-pub fn windows_consle_ctrl_handler(sig: u32) callconv(.C) c_int {
+pub fn windows_consle_ctrl_handler(sig: std.os.windows.DWORD) callconv(.C) std.os.windows.BOOL {
     _ = sig; // autofix
     signal_handler();
-    return 1;
+    return std.os.windows.TRUE;
 }
 
 fn signal_handler() void {
     const stdout = std.io.getStdOut();
     const stdin = std.io.getStdIn();
 
-    _ = stdout.write("\n[!] Reseved SIGINT\n[?] Do you want to shutdown the database? (y/n) ") catch unreachable;
+    _ = stdout.writeAll("\n[!] Reseved SIGINT\n[?] Do you want to shutdown the database? (y/n) ") catch unreachable;
     var answer = std.mem.zeroes([2]u8);
     _ = stdin.read(answer[0..]) catch unreachable;
 

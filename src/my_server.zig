@@ -47,7 +47,10 @@ pub const MyServer = struct {
                 std.debug.print("{any}", .{err});
             };
         } else if (is_windows) {
-            _ = std.os.windows.ws2_32.shutdown(self.server.stream.handle, std.os.windows.ws2_32.SD_RECEIVE);
+            const err_code = std.os.windows.ws2_32.shutdown(self.server.stream.handle, std.os.windows.ws2_32.SD_RECEIVE);
+            if (err_code != 0) {
+                unreachable;
+            }
         }
         self.listening = false;
     }

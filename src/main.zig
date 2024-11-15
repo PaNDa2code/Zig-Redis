@@ -34,17 +34,18 @@ pub fn main() !void {
     const loopback = try net.Ip4Address.parse("127.0.0.1", 6379);
     const localhost = net.Address{ .in = loopback };
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = false, .safety = false }){};
-    defer {
-        const check = gpa.deinit();
-        if (check == .ok) {
-            std.debug.print("[^-^] No leaks detected\n", .{});
-        } else {
-            std.debug.print("[ToT] GPA detected leaks\n", .{});
-        }
-    }
+    // var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = false, .safety = false }){};
+    // defer {
+    //     const check = gpa.deinit();
+    //     if (check == .ok) {
+    //         std.debug.print("[^-^] No leaks detected\n", .{});
+    //     } else {
+    //         std.debug.print("[ToT] GPA detected leaks\n", .{});
+    //     }
+    // }
 
-    const allocator = gpa.allocator();
+    // c_allocator is much faster ;)
+    const allocator = std.heap.raw_c_allocator;
 
     db.db_hashmap_ptr = try allocator.create(DBhashmap);
     db.db_hashmap_ptr.?.init(allocator);
