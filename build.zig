@@ -64,4 +64,10 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    const gdb_command = b.addSystemCommand(&[_][]const u8{"gdb"});
+    gdb_command.addFileArg(exe_unit_tests.getEmittedBin());
+    gdb_command.step.dependOn(&exe_unit_tests.step);
+    const debug_test_step = b.step("debug_test", "Run gdb on tests");
+    debug_test_step.dependOn(&gdb_command.step);
 }
