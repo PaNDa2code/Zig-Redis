@@ -31,8 +31,11 @@ test "test_data_types" {
 
     const allocator2 = std.heap.page_allocator;
 
-    const value_string = "*4\r\n$5\r\nHello\r\n$5\r\nWorld\r\n,10.18\r\n%1\r\n+key\r\n$5\r\nvalue\r\n";
+    const value_string = "*4\r\n$5\r\nHello\r\n$5\r\nWorld\r\n,0\r\n%2\r\n+key\r\n$5\r\nvalue\r\n$4\r\nisOk\r\n#t\r\n";
     var tok = std.mem.tokenizeAny(u8, value_string, "\r\n");
-    const value_from_string = try RESP_Value.fromToknizerAlloc(&tok, allocator2);
-    std.debug.print("{any}\n", .{value_from_string});
+    const value_from_string = try RESP_Value.parseFromTokinizerAlloc(&tok, allocator2);
+
+    const format_string = try std.fmt.allocPrint(allocator2, "{}", .{value_from_string});
+
+    try std.testing.expectEqualSlices(u8, value_string, format_string);
 }
