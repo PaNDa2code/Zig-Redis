@@ -19,7 +19,6 @@ pub const MyServer = struct {
     pub fn init(self: *MyServer, address: std.net.Address, allocator: std.mem.Allocator) !void {
         const server = try address.listen(.{
             .reuse_port = true,
-            // .force_nonblocking = true,
         });
         self.allocator = allocator;
         self.address = address;

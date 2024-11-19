@@ -25,7 +25,6 @@ pub fn handle_client(client: net.Server.Connection) !void {
         }
 
         var it = std.mem.tokenizeAny(u8, buffer[0..bytes], "\r\n");
-
         _ = it.next();
         _ = it.next();
         const command_name = it.next() orelse "";

@@ -2,11 +2,9 @@ const std = @import("std");
 const main = @import("../main.zig").main;
 
 test "test_set" {
-    // const allocator = std.testing.allocator;
-
     _ = try std.Thread.spawn(.{}, main, .{});
 
-    std.time.sleep(3);
+    std.time.sleep(10);
     // Define the server address and port (Redis default is 6379)
     const server_address = try std.net.Address.parseIp4("127.0.0.1", 6379);
 
@@ -25,7 +23,9 @@ test "test_set" {
         _ = try client.write(message);
 
         // Read the response (typically "+OK\r\n" for Redis SET command)
-        var buffer: [16]u8 = undefined;
+
+        var buffer: [5]u8 = undefined;
         _ = try client.read(&buffer);
+        try std.testing.expectEqualSlices(u8, "+OK\r\n", &buffer);
     }
 }
