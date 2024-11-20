@@ -1,5 +1,5 @@
 const std = @import("std");
-const data_types = @import("../data_types.zig");
+const data_types = @import("../resp_types.zig");
 const RESP_Value = data_types.RESP_Value;
 const PESP_Map = data_types.RESP_Map_Entry;
 

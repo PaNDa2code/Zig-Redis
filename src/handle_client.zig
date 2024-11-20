@@ -3,8 +3,8 @@ const net = std.net;
 
 const db = @import("db.zig");
 
-const data_types = @import("data_types.zig");
-const RESP_Value = data_types.RESP_Value;
+const RESP_Types = @import("resp_types.zig");
+const RESP_Value = RESP_Types.RESP_Value;
 
 const tokenizerType = std.mem.TokenIterator(u8, std.mem.DelimiterType.any);
 const CommandFunctionType = fn (net.Server.Connection, *RESP_Value) void;

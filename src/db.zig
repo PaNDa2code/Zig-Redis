@@ -1,5 +1,5 @@
 const std = @import("std");
-const RESP_Value = @import("data_types.zig").RESP_Value;
+const RESP_Value = @import("resp_types.zig").RESP_Value;
 
 pub const DBhashmap = struct {
     kv_hashmap: std.StringHashMap(RESP_Value),
