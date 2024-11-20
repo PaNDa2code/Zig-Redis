@@ -3,9 +3,14 @@ const net = std.net;
 
 const db = @import("db.zig");
 
+const data_types = @import("data_types.zig");
+const RESP_Value = data_types.RESP_Value;
+
 const tokenizerType = std.mem.TokenIterator(u8, std.mem.DelimiterType.any);
-const CommandFunctionType = fn (net.Server.Connection, *tokenizerType) void;
+const CommandFunctionType = fn (net.Server.Connection, *RESP_Value) void;
 const CommandLookUpOb = struct { name: []const u8, fn_ptr: *const CommandFunctionType };
+
+const allocator = std.heap.c_allocator;
 
 const CommandLookUpTable = &[_]CommandLookUpOb{
     .{ .name = "PING", .fn_ptr = &ping },
@@ -25,14 +30,12 @@ pub fn handle_client(client: net.Server.Connection) !void {
         }
 
         var it = std.mem.tokenizeAny(u8, buffer[0..bytes], "\r\n");
-        _ = it.next();
-        _ = it.next();
-        const command_name = it.next() orelse "";
-
-        const command_function = command_lookup(command_name);
+        const command_value = try RESP_Value.parseFromTokinizerAlloc(&it, allocator);
+        const command_name_slice = command_value.list[0].string;
+        const command_function = command_lookup(command_name_slice);
 
         if (command_function != null) {
-            command_function.?(client, &it);
+            command_function.?(client, command_value);
         } else {
             _ = try client.stream.write("+-Unknown command\r\n");
         }
@@ -51,36 +54,31 @@ fn command_lookup(command: []const u8) ?*const CommandFunctionType {
     return null;
 }
 
-fn ping(client: net.Server.Connection, tokens: *tokenizerType) void {
+fn ping(client: net.Server.Connection, command_value: *RESP_Value) void {
     // Write the response and ignore any potential errors
-    if (tokens.next() != null) {
-        _ = client.stream.writer()
-            .print("${}\r\n{s}\r\n", .{ tokens.peek().?.len, tokens.peek().? }) catch {};
+    if (command_value.list.len > 1) {
+        client.stream.writer().print("{}", .{command_value.list[1]}) catch {};
     } else {
-        _ = client.stream.write("+PONG\r\n") catch {};
+        client.stream.writeAll("+PONG\r\n") catch {};
     }
 }
 
-fn config(client: net.Server.Connection, tokens: *tokenizerType) void {
-    _ = tokens; // autofix
+fn config(client: net.Server.Connection, command_value: *RESP_Value) void {
+    _ = command_value; // autofix
     _ = client.stream.write("*1\r\n$5\r\nHello\r\n") catch {};
 }
 
-fn set(client: net.Server.Connection, tokens: *tokenizerType) void {
-    _ = tokens.next();
-    const key = tokens.next();
-    _ = tokens.next();
-    const value = tokens.next();
-
-    if (key == null or value == null) {
-        _ = client.stream.write("-error\r\n") catch {};
+fn set(client: net.Server.Connection, command_value: *RESP_Value) void {
+    if (command_value.list.len < 3) {
+        _ = client.stream.writeAll("-Command SET expicted 2 arguments") catch {};
         return;
     }
-
+    const key = command_value.list[1].string;
+    const value = command_value.list[2];
     const add_return = db.db_hashmap_ptr.?.add(key.?, value.?);
 
     add_return catch {
-        _ = client.stream.write("-error\r\n") catch {};
+        _ = client.stream.write("-\r\n") catch {};
         return;
     };
     _ = client.stream.write("+OK\r\n") catch {};

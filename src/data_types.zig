@@ -27,7 +27,7 @@ pub const RESP_Value = union(RESP_Value_enum) {
     string: []u8,
     simple_string: []u8,
     list: []RESP_Value,
-    map: []RESP_Map,
+    map: RESP_Map,
     null: void,
 
     // for std.fmt
@@ -74,64 +74,89 @@ pub const RESP_Value = union(RESP_Value_enum) {
         }
     }
 
-    pub fn parseFromTokinizerAlloc(tokinizer: *tokenizerType, allocator: std.mem.Allocator) !*RESP_Value {
+    pub fn parseFromTokinizerAlloc(tokinizer: *tokenizerType, allocator: std.mem.Allocator) !RESP_Value {
         const first_tokin = tokinizer.next().?;
-        const value = try allocator.create(RESP_Value);
+        var value: RESP_Value = undefined;
 
         const first_byte: RESP_Value_enum = @enumFromInt(first_tokin[0]);
         switch (first_byte) {
             RESP_Value_enum.int => {
                 const int = try std.fmt.parseInt(i64, first_tokin[1..], 10);
-                value.* = RESP_Value{ .int = int };
-            },
-            RESP_Value_enum.double => {
-                const double = try std.fmt.parseFloat(f64, first_tokin[1..]);
-                value.* = RESP_Value{ .double = double };
-            },
-            RESP_Value_enum.string => {
-                const string = try allocator.dupe(u8, tokinizer.next().?);
-                value.* = RESP_Value{ .string = string };
-            },
-            RESP_Value_enum.simple_string => {
-                const string = try allocator.dupe(u8, first_tokin[1..]);
-                value.* = RESP_Value{ .simple_string = string };
-            },
-
-            RESP_Value_enum.bool => {
-                value.* = RESP_Value{ .bool = first_tokin[1] == 't' };
+                value = RESP_Value{ .int = int };
             },
             RESP_Value_enum.big_int => {
                 const big_int = try std.fmt.parseInt(i128, first_tokin[1..], 10);
-                value.* = RESP_Value{ .big_int = big_int };
+                value = RESP_Value{ .big_int = big_int };
+            },
+            RESP_Value_enum.double => {
+                const double = try std.fmt.parseFloat(f64, first_tokin[1..]);
+                value = RESP_Value{ .double = double };
+            },
+            RESP_Value_enum.string => {
+                const string = try allocator.dupe(u8, tokinizer.next().?);
+                value = RESP_Value{ .string = string };
+            },
+            RESP_Value_enum.simple_string => {
+                const string = try allocator.dupe(u8, first_tokin[1..]);
+                value = RESP_Value{ .simple_string = string };
+            },
+            RESP_Value_enum.bool => {
+                value = RESP_Value{ .bool = first_tokin[1] == 't' };
             },
             RESP_Value_enum.list => {
                 const list_len = try std.fmt.parseInt(usize, first_tokin[1..], 10);
                 var list: []RESP_Value = try allocator.alloc(RESP_Value, list_len);
                 for (0..list_len) |i| {
-                    list[i] = (try parseFromTokinizer(tokinizer, allocator)).*;
+                    list[i] = try parseFromTokinizerAlloc(tokinizer, allocator);
                 }
-                value.* = RESP_Value{ .list = list };
+                value = RESP_Value{ .list = list };
             },
             RESP_Value_enum.map => {
                 const map_len = try std.fmt.parseInt(usize, first_tokin[1..], 10);
-                var map: []RESP_Map = try allocator.alloc(RESP_Map, map_len);
+                var map: []RESP_Map_Entry = try allocator.alloc(RESP_Map_Entry, map_len);
                 for (0..map_len) |i| {
-                    map[i].key = (try parseFromTokinizer(tokinizer, allocator)).*;
-                    map[i].value = (try parseFromTokinizer(tokinizer, allocator)).*;
+                    const temp_key = try parseFromTokinizerAlloc(tokinizer, allocator);
+                    const temp_value = try parseFromTokinizerAlloc(tokinizer, allocator);
+                    map[i].key = temp_key;
+                    map[i].value = temp_value;
                 }
-                value.* = RESP_Value{ .map = map };
+                value = RESP_Value{ .map = map };
             },
             RESP_Value_enum.null => {
-                value.* = RESP_Value{ .null = undefined };
+                value = RESP_Value{ .null = undefined };
             },
         }
         return value;
     }
+
+    pub fn clean_up(self: *const RESP_Value, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .int, .big_int, .double, .bool, .null => {},
+            .string, .simple_string => |s| {
+                allocator.free(s);
+            },
+            .list => |list| {
+                for (list) |item| {
+                    item.clean_up(allocator);
+                }
+                allocator.free(list);
+            },
+            .map => |map| {
+                for (map) |entry| {
+                    entry.value.clean_up(allocator);
+                    entry.key.clean_up(allocator);
+                }
+                allocator.free(map);
+            },
+        }
+    }
 };
 
-pub const RESP_Map = struct {
+pub const RESP_Map_Entry = struct {
     key: RESP_Value,
     value: RESP_Value,
 };
+
+pub const RESP_Map = []RESP_Map_Entry;
 
 const tokenizerType = std.mem.TokenIterator(u8, std.mem.DelimiterType.any);
