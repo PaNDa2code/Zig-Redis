@@ -74,6 +74,11 @@ pub const RESP_Value = union(RESP_Value_enum) {
         }
     }
 
+    pub fn parseFromSliceAlloc(slice: []const u8, allocator: std.mem.Allocator) !RESP_Value {
+        var tokinizer = std.mem.tokenizeAny(u8, slice, "\r\n");
+        return parseFromTokinizerAlloc(&tokinizer, allocator);
+    }
+
     pub fn parseFromTokinizerAlloc(tokinizer: *tokenizerType, allocator: std.mem.Allocator) !RESP_Value {
         const first_tokin = tokinizer.next().?;
         var value: RESP_Value = undefined;
@@ -149,6 +154,47 @@ pub const RESP_Value = union(RESP_Value_enum) {
                 allocator.free(map);
             },
         }
+    }
+
+    pub fn copy(self: *const RESP_Value, allocator: std.mem.Allocator) !RESP_Value {
+        var value: RESP_Value = undefined;
+        switch (self.*) {
+            .int => |int| {
+                value = RESP_Value{ .int = int };
+            },
+            .big_int => |big_int| {
+                value = RESP_Value{ .big_int = big_int };
+            },
+            .double => |double| {
+                value = RESP_Value{ .double = double };
+            },
+            .bool => |boolen| {
+                value = RESP_Value{ .bool = boolen };
+            },
+            .string => |string| {
+                value = RESP_Value{ .string = try allocator.dupe(u8, string) };
+            },
+            .simple_string => |simple_string| {
+                value = RESP_Value{ .string = try allocator.dupe(u8, simple_string) };
+            },
+            .list => |list| {
+                value = RESP_Value{ .list = try allocator.alloc(RESP_Value, list.len) };
+                for (0..list.len) |i| {
+                    value.list[i] = try list[i].copy(allocator);
+                }
+            },
+            .map => |map| {
+                value = RESP_Value{ .map = try allocator.alloc(RESP_Map_Entry, map.len) };
+                for (0..map.len) |i| {
+                    value.map[i].key = try map[i].key.copy(allocator);
+                    value.map[i].value = try map[i].value.copy(allocator);
+                }
+            },
+            .null => {
+                value = RESP_Value{ .null = undefined };
+            },
+        }
+        return value;
     }
 };
 
