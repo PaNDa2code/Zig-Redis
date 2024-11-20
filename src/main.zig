@@ -42,9 +42,9 @@ pub fn main() !void {
     defer {
         if (builtin.mode == .Debug) {
             if (gpa.deinit() == .leak) {
-                std.debug.print("[ToT] GPA detected memory leaks\n", .{});
+                std.debug.print("[x] [x_x] GPA detected memory leaks\n", .{});
             } else {
-                std.debug.print("[^_^] No leaks detected\n", .{});
+                std.debug.print("[✔] [^_^] No leaks detected\n", .{});
             }
         }
     }
@@ -63,7 +63,7 @@ pub fn main() !void {
 
     defer server.deinit();
 
-    std.debug.print("(⌐■_■) Listing on {any}\n", .{localhost});
+    std.debug.print("[*] (⌐■_■) Listing on {any}\n", .{localhost});
 
     thread_pool = std.ArrayList(std.Thread).init(allocator);
     defer thread_pool.deinit();
@@ -74,14 +74,14 @@ pub fn main() !void {
     while (server.listening) {
         const client = server.accept() catch |err| {
             if (err == std.net.Server.AcceptError.SocketNotListening) {
-                std.debug.print("[0_0] Server is stopped\n", .{});
+                std.debug.print("[!] [0_0] Server is stopped\n", .{});
                 break;
             } else {
-                std.debug.print("error: {any}", .{err});
+                std.debug.print("[x] error: {any}", .{err});
                 continue;
             }
         };
-        const thread = try std.Thread.spawn(.{}, handle_client, .{client});
+        const thread = try std.Thread.spawn(.{}, handle_client, .{ client, allocator });
         try thread_pool.append(thread);
     }
 
