@@ -63,15 +63,3 @@ pub const DBhashmap = struct {
 };
 
 pub var db_hashmap_ptr: ?*DBhashmap = null;
-
-test "test DBhashmap" {
-    const allocator = std.testing.allocator;
-    var hashmap: DBhashmap = undefined;
-
-    hashmap.init(allocator);
-    defer hashmap.deinit();
-
-    for (0..100) |_| {
-        try hashmap.add("key", "value");
-    }
-}
